@@ -1,0 +1,116 @@
+Domain Events Demo
+-------------------------------------------------------------------------------
+
+Create new Console Application
+-------------------------------------------------------------------------------
+Create new Console Solution
+
+Add StructureMap via nuget (local)
+Add JaySmith.DomainEvents.StructureMap via nuget (local)
+	
+Create BootStrapper class
+	public static class BootStrapper
+	public static void Initalize()
+	{
+		ObjectFactory.Initialize(x => x.Scan(scan =>
+		{
+			scan.TheCallingAssembly();
+			scan.WithDefaultConventions();
+			scan.AssembliesFromApplicationBaseDirectory();
+			scan.LookForRegistries();
+		}
+	}
+	
+Create DemoApplication
+
+	public class DemoApplication
+    {
+        public void Run()
+        {
+			//Where something interesting happens
+			Console.Writeline("Domain Event Demo");
+        }
+    }
+	
+Modify Program Main
+	static void Main(string[] args)
+    {
+		Bootstrapper.Initialize();
+
+		var application = ObjectFactory.GetInstance<DemoApplication>();
+        application.Run();
+
+        Console.Read();
+    }
+	
+Run Demo to make sure it is working so far	
+
+Add Domain Folder
+Add Domain Object: Person
+	Constructor (string firstName, string lastName)
+	
+	Properties 
+		FirstName 	AUTO
+		LastName	AUTO
+		        	
+		Full Name Getter Only - return string.Format("{0} {1}", FirstName, LastName);
+		
+		Stub out UpdateLastName(string newLastName)
+		public void UpdateLastName(string newLastName)
+        {
+            LastName = newLastName;
+        }
+		
+Modify DemoApplication Run
+	{
+		var person = new Person("Kristina", "Parker");
+		person.UpdateLastName = "Smith";
+	}
+	
+Talk about LastName Changed as an interesting event
+
+Create DomainEvents Folder
+Add PersonLastNameChangedEvent
+	public class PersonLastNameChangedEvent : IDomainEvent
+	{
+		public Person Person { get; set; }
+		public string OldValue { get; set; }
+		public string NewValue { get; set; }
+
+		public PersonLastNameChangedEvent(Person person, string oldValue, string newValue )
+		{
+			this.Person = person;
+			this.OldValue = oldValue;
+			this.NewValue = newValue;
+		}
+	}
+
+Modify the Person class to raise the event when the last name is changed
+	public void UpdateLastName(string newLastName)
+        {
+            var oldLastName = LastName;
+            LastName = newLastName;
+
+            var lastNameChangedEvent = new PersonLastNameChangedEvent(this, oldLastName, newLastName);
+            DomainEventManager.Raise(lastNameChangedEvent);
+        }
+
+The event gets raised but nothing is listening to for the event. So, lets do
+something when this event happens, to do that we need an event handler.
+		
+Add DomainEventHandlers Folder
+Add PersonLastNameCHangedEventHandler
+	
+	public class PersonLastNameChangedEventHandler : IDomainEventHandler<PersonLastNameChangedEvent>
+	{
+		public void Handle(PersonLastNameChangedEvent args)
+		{
+			Console.WriteLine("Lastname changed from {0} to {1}", args.OldValue, args.NewValue);
+		}
+	}
+
+Modify BootStrapper
+	scan.ConnectImplementationsToTypesClosing(typeof(IDomainEventHandler<>));
+	
+Run Program to show how the event fires.
+Go over how domain events are found and executed
